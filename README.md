@@ -126,4 +126,3 @@ property-report-generator/
 ## Author
 
 Salaheldin Ali · Applied Mathematics & Economics, University of South Florida  
-Pursuing actuarial career (SOA track) with a focus on health insurance
