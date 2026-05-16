@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Property Report Generator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #fafaf9;
+      --surface:  #ffffff;
+      --border:   #e5e2db;
+      --text:     #1a1a18;
+      --muted:    #6b6b68;
+      --accent:   #1a1a18;
+      --pos:      #166534;
+      --pos-bg:   #dcfce7;
+      --neg:      #991b1b;
+      --neg-bg:   #fee2e2;
+      --warn:     #92400e;
+      --warn-bg:  #fef3c7;
+      --radius:   10px;
+      --shadow:   0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    body {
+      font-family: -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container { max-width: 680px; margin: 0 auto; }
+
+    header { margin-bottom: 2rem; }
+    header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.3px; margin-bottom: 4px; }
+    header p { font-size: 14px; color: var(--muted); }
+
+    .input-row { display: flex; gap: 10px; margin-bottom: 2rem; }
+    .input-row input {
+      flex: 1; padding: 11px 14px; font-size: 15px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); outline: none; transition: border-color 0.15s;
+    }
+    .input-row input:focus { border-color: var(--accent); }
+    .input-row button {
+      padding: 11px 22px; font-size: 14px; font-weight: 500;
+      background: var(--accent); color: #fff; border: none;
+      border-radius: var(--radius); cursor: pointer; transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+    .input-row button:hover { opacity: 0.85; }
+    .input-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .loading { display: flex; align-items: center; gap: 12px; padding: 2rem 0; color: var(--muted); font-size: 14px; }
+    .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--text); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error { padding: 1rem 1.25rem; border: 1px solid #fca5a5; background: #fff1f2; border-radius: var(--radius); font-size: 14px; color: var(--neg); }
+
+    .report { animation: up 0.25s ease; }
+    @keyframes up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .report-title { font-size: 20px; font-weight: 600; margin-bottom: 2px; }
+    .report-meta { font-size: 13px; color: var(--muted); margin-bottom: 1.5rem; }
+
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
+    .metric {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow);
+    }
+    .metric .lbl { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .metric .val { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+    .metric .chg { font-size: 12px; font-weight: 500; }
+    .chg-up   { color: var(--pos); }
+    .chg-down { color: var(--neg); }
+    .chg-flat { color: var(--muted); }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem; box-shadow: var(--shadow);
+    }
+    .card-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+    .card p { font-size: 14px; line-height: 1.7; }
+
+    .outlook-badge {
+      display: inline-block; padding: 3px 10px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; margin-left: 8px; vertical-align: middle;
+    }
+    .outlook-bullish { background: var(--pos-bg); color: var(--pos); }
+    .outlook-bearish  { background: var(--neg-bg);  color: var(--neg); }
+    .outlook-neutral  { background: var(--warn-bg); color: var(--warn); }
+
+    .risks { display: flex; flex-wrap: wrap; gap: 8px; }
+    .risk-badge { font-size: 12px; font-weight: 500; padding: 4px 11px; border-radius: 20px; }
+    .risk-low    { background: var(--pos-bg);  color: var(--pos); }
+    .risk-medium { background: var(--warn-bg); color: var(--warn); }
+    .risk-high   { background: var(--neg-bg);  color: var(--neg); }
+
+    .rec-box { padding: 1.25rem 1.5rem; border-radius: var(--radius); font-size: 14px; line-height: 1.6; }
+    .rec-buy   { background: var(--pos-bg);  border: 1px solid #86efac; color: #14532d; }
+    .rec-hold  { background: var(--warn-bg); border: 1px solid #fcd34d; color: #78350f; }
+    .rec-avoid { background: var(--neg-bg);  border: 1px solid #fca5a5; color: #7f1d1d; }
+    .rec-label { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+    .footnote { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Property Report Generator</h1>
+    <p>AI-powered investment summaries using live FRED macroeconomic data</p>
+  </header>
+
+  <div class="input-row">
+    <input id="zip" type="text" placeholder="Enter zip code (e.g. 33620)" maxlength="5" />
+    <button id="btn" onclick="run()">Generate report</button>
+  </div>
+
+  <div id="output"></div>
+</div>
+
+<script>
+async function run() {
+  const zip = document.getElementById("zip").value.trim();
+  if (!/^\d{5}$/.test(zip)) {
+    document.getElementById("output").innerHTML = `<div class="error">Please enter a valid 5-digit zip code.</div>`;
+    return;
+  }
+
+  const btn = document.getElementById("btn");
+  btn.disabled = true;
+  document.getElementById("output").innerHTML = `<div class="loading"><div class="spinner"></div>Fetching FRED data and generating AI analysis…</div>`;
+
+  try {
+    const res = await fetch("/report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ zip_code: zip }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Server error");
+    }
+    const d = await res.json();
+    render(d);
+  } catch (e) {
+    document.getElementById("output").innerHTML = `<div class="error">Error: ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function render(d) {
+  const ai = d.ai_analysis;
+  const outlook = ai.outlook || "neutral";
+  const rec = ai.recommendation || "hold";
+
+  const metricsHTML = d.metrics.map(m => {
+    const cls = m.direction === "up" ? "chg-up" : m.direction === "down" ? "chg-down" : "chg-flat";
+    const arrow = m.direction === "up" ? "↑" : m.direction === "down" ? "↓" : "→";
+    return `
+      <div class="metric">
+        <div class="lbl">${m.label}</div>
+        <div class="val">${m.value}</div>
+        ${m.change ? `<div class="chg ${cls}">${arrow} ${m.change}</div>` : ""}
+      </div>`;
+  }).join("");
+
+  const risksHTML = (ai.risks || []).map(r =>
+    `<span class="risk-badge risk-${r.level}">${r.label} — ${r.level}</span>`
+  ).join("");
+
+  document.getElementById("output").innerHTML = `
+  <div class="report">
+    <div class="report-title">
+      ${d.city} · ${d.zip_code}
+      <span class="outlook-badge outlook-${outlook}">${outlook.charAt(0).toUpperCase() + outlook.slice(1)}</span>
+    </div>
+    <div class="report-meta">FRED data · Claude AI · ${new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</div>
+
+    <div class="metrics-grid">${metricsHTML}</div>
+
+    <div class="card">
+      <div class="card-label">Market summary</div>
+      <p>${ai.summary}</p>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Risk flags</div>
+      <div class="risks">${risksHTML}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Actuarial perspective</div>
+      <p>${ai.actuarial_note}</p>
+    </div>
+
+    <div class="rec-box rec-${rec}">
+      <div class="rec-label">${rec.charAt(0).toUpperCase() + rec.slice(1)}</div>
+      <div>${ai.rec_reason}</div>
+    </div>
+
+    <hr />
+    <p class="footnote">Data: Case-Shiller HPI (CSUSHPISA), Freddie Mac PMMS (MORTGAGE30US), BLS UNRATE, BLS CPIAUCSL, Census HOUST via FRED API. For educational purposes only — not financial advice.</p>
+  </div>`;
+}
+
+document.getElementById("zip").addEventListener("keydown", e => {
+  if (e.key === "Enter") run();
+});
+</script>
+</body>
+</html>
